@@ -8,6 +8,7 @@ class Config():
     SQLALCHEMY_TRACK_MODIFIATIONS=False
     CELERY_BROKER_URL='redis://localhost:6379/1',
     CELERY_RESULT_BACKEND='redis://localhost:6379/2'
+    broker_connection_retry_on_startup = True
     
 class LocalDevelopmentConfig(Config):
     SQLITE_DB_DIR=os.path.join(cur_directory,"../db_directory")
