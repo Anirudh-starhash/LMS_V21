@@ -308,13 +308,15 @@ def generate_report():
     # Start the Celery task
     try:
         # Trigger the Celery task
-        job = send_activity_report.delay()
+        send_activity_report()
+        
         
         # Return the task ID to the client
         return jsonify({
             'status': 'Done',
-            'task_id': job.id
+            # 'task_id': job.id
         }), 200
+        
     except Exception as e:
         # Log the exception
         app.logger.error(f"Error starting task: {str(e)}")
@@ -325,36 +327,5 @@ def generate_report():
             'message': 'An error occurred while starting the task.'
         }), 500
         
-@lib_blueprint.route('/task-status/<task_id>', methods=['GET'])
-def task_status(task_id):
-    try:
-        # Create an AsyncResult instance with the task ID
-        job = AsyncResult(task_id, app=celery)
 
-        # Check if the task has completed
-        if job.ready():
-            if job.successful():
-                result = job.get()  # Get the result of the task
-                return jsonify({
-                    'status': 'Completed',
-                    'result': result
-                }), 200
-            else:
-                return jsonify({
-                    'status': 'Failed',
-                    'result': str(job.result)  # Ensure the result is a string
-                }), 500
-        else:
-            return jsonify({
-                'status': 'In Progress'
-            }), 202
-    except Exception as e:
-        # Log the exception
-        app.logger.error(f"Error checking task status: {str(e)}")
-        
-        # Return an error response
-        return jsonify({
-            'status': 'Error',
-            'message': 'An error occurred while checking the task status.'
-        }), 500
 
