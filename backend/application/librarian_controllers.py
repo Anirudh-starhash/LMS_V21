@@ -311,10 +311,10 @@ def generate_report():
         send_activity_report()
         
         
+        
         # Return the task ID to the client
         return jsonify({
             'status': 'Done',
-            # 'task_id': job.id
         }), 200
         
     except Exception as e:
