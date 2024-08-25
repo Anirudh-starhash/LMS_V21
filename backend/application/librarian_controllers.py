@@ -304,8 +304,12 @@ def getDetails():
     
 @lib_blueprint.route('/generate_report', methods=['GET','POST'])
 def generate_report():
-    send_activity_report().delay()
-    return jsonify({'status': 'Report generation started!'}),200
+    job=send_activity_report().delay()
+    result=job.wait()
+    return jsonify({
+        'status': 'Report generation started!',
+        'result':result
+    }),200
 
 
   
