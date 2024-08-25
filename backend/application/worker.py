@@ -1,7 +1,7 @@
 from celery import Celery,Task
 from flask import current_app as app
 
-celery=Celery("Application Jobs")
+celery=Celery('tasks', broker='redis://localhost:6379/0',backend='redis://localhost:6379/0')
 
 class ContextTask(Task):
         def __call__(self, *args, **kwargs):

@@ -10,7 +10,8 @@ from celery import shared_task
 from fpdf import *
 from flask_mail import Mail, Message
 from celery.contrib.abortable import AbortableTask
-
+from application.tasks import *
+from celery.result import AsyncResult
 # above things are imports 
 
 
@@ -605,170 +606,57 @@ def setTiming(user_id):
 @user_blueprint.route("/sendEmail/<int:id>",methods=['GET','POST'])
 def sendEmail(id):
    
-    get_activity(id)
-    return jsonify({
-        'msg':'Done!'
-    }),200
+    try:
+        # Trigger the Celery task
+        job =get_activity.delay(id)
+        
+        # Return the task ID to the client
+        return jsonify({
+            'status': 'Done',
+            'task_id': job.id
+        }), 200
+    except Exception as e:
+        # Log the exception
+        app.logger.error(f"Error starting task: {str(e)}")
+        
+        # Return an error response
+        return jsonify({
+            'status': 'Error',
+            'message': 'An error occurred while starting the task.'
+        }), 500
     
-@shared_task(bind=True,base=AbortableTask)
-def get_activity(self,id):
-    user=db.session.execute(db.Select(User).where(User.user_id==id)).scalar()
-    info=db.session.execute(db.Select(Book_issue).where(Book_issue.user_id==id)).scalars().all()
-    
-    
+@user_blueprint.route('/task-status/<task_id>', methods=['GET'])
+def task_status(task_id):
+    try:
+        # Create an AsyncResult instance with the task ID
+        job = AsyncResult(task_id, app=celery)
 
-        # print(info)
-    issued_books=[]
-    returned_books=[]
-    requested_books=[]
-    for x in info:
-        if x.doi!=None and x.re_issue==1:
-            issued_books.append(x)
-        elif x.return_date!=None and x.re_issue==1:
-            returned_books.append(x)
+        # Check if the task has completed
+        if job.ready():
+            if job.successful():
+                result = job.get()  # Get the result of the task
+                return jsonify({
+                    'status': 'Completed',
+                    'result': result
+                }), 200
+            else:
+                return jsonify({
+                    'status': 'Failed',
+                    'result': str(job.result)  # Ensure the result is a string
+                }), 500
         else:
-            if x.re_issue==1:
-                requested_books.append(x)
-            
-    # print(issued_books)
-    # print(requested_books)
-    # print(returned_books)
-            
-    issued_books_list = [
-        {
-            "title": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no==issue.ISBN_no)).scalar().title,
-            "doi": issue.doi,
-            "due_date": issue.due_date,
-            "feedback": issue.feedback,
-            "rating": issue.rating,
-            "request_date":None,
-            "return_date":None,
-            "book_img":db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no==issue.ISBN_no)).scalar().book_img_url,
-        }
-        for issue in issued_books
-    ]
-
-    # Get books returned by the user
-    returned_books_list = [
-        {
-            "title":db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no==issue.ISBN_no)).scalar().title,
-            "return_date": issue.return_date,
-            "feedback": issue.feedback,
-            "rating": issue.rating,
-            "doi":None,
-            "request_date":None,
-            "book_img":db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no==issue.ISBN_no)).scalar().book_img_url,
-        }
-        for issue in returned_books
-    ]
-
-    # Get books requested by the user
-    requested_books_list = [
-        {
-            "title": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no==issue.ISBN_no)).scalar().title,
-            "request_date": issue.request_date,
-            "doi":None,
-            "return_date":None,
-            "book_img":db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no==issue.ISBN_no)).scalar().book_img_url,
-        }
-        for issue in requested_books
-    ]
-
-    # Compile the data for the user
-    user_info = {
-        "name": f"{user.user_fname} {user.user_lname}",
-        "profile_pic": user.profile_pic,
-        "email": user.user_email,
-        "issued_books": issued_books_list,
-        "returned_books": returned_books_list,
-        "requested_books": requested_books_list,
-    }
-    email_body = generate_email_body(user_info)
-    send_report_email(user.user_email, email_body)
-
-from datetime import datetime, timedelta
-
-def generate_email_body(user_info):
-    user_name = user_info["name"]
-    issued_books = user_info["issued_books"]
-    returned_books = user_info["returned_books"]
-    requested_books = user_info["requested_books"]
-
-    # Start constructing the email body
-    email_body = f"Hey {user_name},\n\n"
-    email_body += "This is LMS_API_BOT sending you an email regarding your book status.\n\n"
-
-    # Add issued books section
-    if issued_books:
-        email_body += "Issued Books:\n"
-        for book in issued_books:
-            doi_str = book["doi"].strftime('%Y-%m-%d') if book["doi"] else "N/A"
-            due_date_str = book["due_date"].strftime('%Y-%m-%d') if book["due_date"] else "N/A"
-            email_body += f"Title: {book['title']}\n"
-            email_body += f"Date of Issue: {doi_str}\n"
-            email_body += f"Due Date: {due_date_str}\n"
-            email_body += f"Feedback: {book['feedback']}\n"
-            email_body += f"Rating: {book['rating']}/5\n"
-            email_body += f"Book Image: {book['book_img']}\n\n"
-
-            # Check if due date is within the next 2 days
-            if book["due_date"]:
-                days_left = (book["due_date"].date() - datetime.now().date()).days
-                if days_left in [0, 1, 2]:
-                    email_body += "**You have a deadline! Please submit your book on or before the due date.**\n\n"
-
-    # Add returned books section
-    if returned_books:
-        email_body += "Returned Books:\n"
-        for book in returned_books:
-            return_date_str = book["return_date"].strftime('%Y-%m-%d') if book["return_date"] else "N/A"
-            email_body += f"Title: {book['title']}\n"
-            email_body += f"Return Date: {return_date_str}\n"
-            email_body += f"Feedback: {book['feedback']}\n"
-            email_body += f"Rating: {book['rating']}/5\n"
-            email_body += f"Book Image: {book['book_img']}\n\n"
-
-    # Add requested books section
-    if requested_books:
-        email_body += "Requested Books:\n"
-        for book in requested_books:
-            request_date_str = book["request_date"].strftime('%Y-%m-%d') if book["request_date"] else "N/A"
-            email_body += f"Title: {book['title']}\n"
-            email_body += f"Request Date: {request_date_str}\n"
-            email_body += f"Book Image: {book['book_img']}\n\n"
-
-    email_body += "Best regards,\nLMS_API_BOT"
-
-    return email_body
-
-# sending email
-def send_report_email(email, email_body):
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    import smtplib
-    msg = MIMEMultipart()
-    sender = "anirudhpabbaraju1103@gmail.com"
-    recipient = email
-    password = 'atnipcvnvvxvcghn'
-
-    # Set the basic email parameters
-    msg['Subject'] = "Activities!"
-    msg['From'] = sender
-    msg['To'] = recipient
-    
-    
-    
-    # Attach the email body as plain text
-    msg.attach(MIMEText(email_body, 'plain'))
-
-    # Send the email
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp_server:
-        smtp_server.login(sender, password)
-        smtp_server.sendmail(sender, recipient, msg.as_string())
-
-
-
-
+            return jsonify({
+                'status': 'In Progress'
+            }), 202
+    except Exception as e:
+        # Log the exception
+        app.logger.error(f"Error checking task status: {str(e)}")
+        
+        # Return an error response
+        return jsonify({
+            'status': 'Error',
+            'message': 'An error occurred while checking the task status.'
+        }), 500
 
 
 

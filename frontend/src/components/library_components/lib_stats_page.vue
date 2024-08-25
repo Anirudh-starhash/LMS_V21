@@ -62,8 +62,7 @@ export default {
       try{
         const r=await axios.get("http://127.0.0.1:5000/api/generate_report");
         if(r.status==200){
-          result=r.data.result;
-          alert(`Report Sent to Mail Check it out ${result}`)
+          alert(`Report Sent to Mail Check it out`)
         }
       }
       catch(error){
