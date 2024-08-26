@@ -9,8 +9,15 @@ class Config():
     CELERY_BROKER_URL='redis://localhost:6379/0',
     CELERY_RESULT_BACKEND='redis://localhost:6379/0'
     broker_connection_retry_on_startup = True
+    task_serializer = 'json'
+    result_serializer = 'json'
+    accept_content = ['json']
+    timezone = 'UTC'
+    enable_utc = True
     
 class LocalDevelopmentConfig(Config):
     SQLITE_DB_DIR=os.path.join(cur_directory,"../db_directory")
     SQLALCHEMY_DATABASE_URI="sqlite:///"+os.path.join(SQLITE_DB_DIR,"testdb.sqlite3")
     DEBUG=True
+    
+   

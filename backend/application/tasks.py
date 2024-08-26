@@ -6,6 +6,9 @@ from PIL import Image
 from fpdf import FPDF
 import os,smtplib
 from flask import current_app as app
+from celery.schedules import crontab
+from celery import shared_task
+from celery.contrib.abortable import AbortableTask
 
 
 
@@ -429,6 +432,19 @@ def generate_email_body(user_info):
     return email_body
 
 # sending email
+@celery.on_after_finalize.connect
+def setup_schedule_task(sender,**kwargs):
+    sender.add_periodic_task(10.0,print_current_time_job.s(),name='At every 10s')
+    
+@celery.task(_loc=None,bind=True)
+def print_current_time_job(self):
+    print("Received arguments:", self)
+    print("START")
+    now=datetime.now()
+    print("now in task =",now)
+    dt_string=now.strftime("%d/%m/%Y %H:%M:%S")
+    print("date and time=",dt_string)
+    print("Complete")
 
 
 
