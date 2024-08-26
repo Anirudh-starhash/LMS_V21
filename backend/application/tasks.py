@@ -1,7 +1,7 @@
 from application.worker import celery
 from datetime import datetime
 from application.database import db
-from application.models import User,Book_catalogue,Book_issue
+from application.models import User,Book_catalogue,Book_issue,Schedule
 from PIL import Image
 from fpdf import FPDF
 import os,smtplib
@@ -436,6 +436,26 @@ def generate_email_body(user_info):
 def setup_schedule_task(sender,**kwargs):
     sender.add_periodic_task(10.0,print_current_time_job.s(),name='At every 10s')
     
+    users = User.query.all()
+    for user in users:
+        schedule=db.session.execute(db.Select(Schedule).where(Schedule.user_id==user.user_id)).scalar()
+        if schedule!=None:
+            time_range=schedule.timing
+            start_time_str = time_range.split(" - ")[0]
+            # Convert to 24-hour format and extract the hour
+            start_time = datetime.strptime(start_time_str, "%I:%M %p")
+            hour = start_time.hour
+            minute = 30  # Send at the 30th minute of the hour
+
+            # Add the periodic task with the computed crontab
+            sender.add_periodic_task(
+                crontab(minute=minute, hour=hour),
+                send_email.s(user.user_id),
+                name=f'Mail at {hour}:{minute:02d} for user {user.user_id}'
+            )
+        
+        
+    
 @celery.task(bind=True)
 def print_current_time_job(self):
     print("Received arguments:", self)
@@ -445,6 +465,10 @@ def print_current_time_job(self):
     dt_string=now.strftime("%d/%m/%Y %H:%M:%S")
     print("date and time=",dt_string)
     print("Complete")
+    
+    return dt_string
+
+
 
 
 
