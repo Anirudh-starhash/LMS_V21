@@ -436,7 +436,7 @@ def generate_email_body(user_info):
 def setup_schedule_task(sender,**kwargs):
     sender.add_periodic_task(10.0,print_current_time_job.s(),name='At every 10s')
     
-@celery.task(_loc=None,bind=True)
+@celery.task(bind=True)
 def print_current_time_job(self):
     print("Received arguments:", self)
     print("START")
