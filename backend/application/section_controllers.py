@@ -2,9 +2,13 @@ from flask import Blueprint, jsonify, request
 from application.models import Section,Book_catalogue,Book_issue,User
 from application.database import db
 from datetime import datetime
+from flask_caching import Cache
+from flask import current_app as app
+cache=Cache(app)
 
 sec_blueprint=Blueprint("sec",__name__)
 
+@cache.cached(timeout=60) 
 @sec_blueprint.route("/getSections",methods=['GET','POST'])
 def get():
     sec=db.session.execute(db.select(Section)).scalars().all()
@@ -22,6 +26,7 @@ def get():
         'sections':section_info
     }),200
     
+@cache.cached(timeout=60) 
 @sec_blueprint.route("/getSection/<int:id>",methods=['GET','POST'])
 def get_sec(id):
     sec=db.session.execute(db.select(Section).where(Section.section_id==id)).scalar()
@@ -37,7 +42,7 @@ def get_sec(id):
         'section_info':section_info
     }),200
     
-        
+@cache.cached(timeout=60)       
 @sec_blueprint.route("/addSection",methods=['POST','GET'])
 def add():
     data=request.get_json()
@@ -62,6 +67,7 @@ def add():
             'msg':'Section already exists'
         }),201
         
+@cache.cached(timeout=60) 
 @sec_blueprint.route("/editSection/<int:id>",methods=['POST','GET'])
 def edit(id):
     data=request.get_json()
@@ -87,6 +93,7 @@ def edit(id):
             'msg':'Editted Successfully!'
         }),200
         
+@cache.cached(timeout=60) 
 @sec_blueprint.route("/getBooks/<int:id>",methods=['GET','POST'])
 def getBooks(id):
     books=db.session.execute(db.select(Book_catalogue).where(Book_catalogue.section_id==id)).scalars().all()
@@ -109,6 +116,7 @@ def getBooks(id):
         'sections':section_info
     }),200
     
+@cache.cached(timeout=60) 
 @sec_blueprint.route("/deleteSection",methods=['GET','POST'])
 def deleteSection():
     data=request.get_json()

@@ -114,7 +114,11 @@ def not_authorized(self):
     
 @app.route("/api/time",methods=['GET','POST'])
 def time():
-    job=print_current_time_job
+    job,name=print_current_time_job("Hey!")
+    return jsonify({
+        'msg':job,
+        'name':name
+    }),200
 
 with app.app_context():
     db.create_all()

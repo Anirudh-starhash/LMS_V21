@@ -102,7 +102,7 @@ class PDF(FPDF):
         self.ln(10)  # Add space after each book entry
 
 #generate_pdf 
-@celery.task(bind=True)
+@celery.task
 def send_activity_report(self):
     try:
         users = User.query.all()
@@ -300,7 +300,7 @@ def send_email(email, email_body):
         smtp_server.sendmail(sender, recipient, msg.as_string())
         
         
-@celery.task(bind=True)
+@celery.task
 def get_activity(self,id):
     user=db.session.execute(db.Select(User).where(User.user_id==id)).scalar()
     info=db.session.execute(db.Select(Book_issue).where(Book_issue.user_id==id)).scalars().all()
@@ -434,7 +434,7 @@ def generate_email_body(user_info):
 # sending email
 @celery.on_after_finalize.connect
 def setup_schedule_task(sender,**kwargs):
-    sender.add_periodic_task(10.0,print_current_time_job.s(),name='At every 10s')
+    sender.add_periodic_task(10.0,print_current_time_job.s("Anirudh"),name='At every 10s')
     
     users = User.query.all()
     for user in users:
@@ -456,8 +456,8 @@ def setup_schedule_task(sender,**kwargs):
         
         
     
-@celery.task(bind=True)
-def print_current_time_job(self):
+@celery.task
+def print_current_time_job(self,name):
     print("Received arguments:", self)
     print("START")
     now=datetime.now()
@@ -466,7 +466,7 @@ def print_current_time_job(self):
     print("date and time=",dt_string)
     print("Complete")
     
-    return dt_string
+    return dt_string,name
 
 
 
