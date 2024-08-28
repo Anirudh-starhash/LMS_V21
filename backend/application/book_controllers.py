@@ -4,15 +4,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from application.models import Book_catalogue,Book_issue,User,Section
 from application.database import db
 from datetime import timedelta,datetime
-from flask import current_app as app
-from flask_caching import Cache
-cache=Cache(app)
+
+
 
 book_blueprint=Blueprint("book",__name__)
 
 
-    
-@cache.cached(timeout=60)        
+      
 @book_blueprint.route("/addBook",methods=['POST','GET'])
 def addBook():
     data=request.get_json()
@@ -43,7 +41,7 @@ def addBook():
         }),201
         
     
-@cache.cached(timeout=60)     
+  
 @book_blueprint.route("/editBook",methods=['POST','GET'])
 def editBook():
     data=request.get_json()
@@ -79,8 +77,7 @@ def editBook():
         return jsonify({
             'msg':'Book Edit Successful!'
         }),200
-        
-@cache.cached(timeout=60) 
+ 
 @book_blueprint.route("/getBook/<int:ISBN>",methods=['GET','POST'])
 def getBook(ISBN):
     book=db.session.execute(db.select(Book_catalogue).where(Book_catalogue.ISBN_no==ISBN)).scalar()
@@ -100,7 +97,7 @@ def getBook(ISBN):
         'book_info':book_info
     }),200
     
-@cache.cached(timeout=60) 
+
 @book_blueprint.route("/getBooks",methods=['GET','POST'])
 def getBooks():
     books=db.session.execute(db.select(Book_catalogue)).scalars().all()
@@ -124,7 +121,7 @@ def getBooks():
         'books':book_info
     }),200
 
-@cache.cached(timeout=60)     
+  
 @book_blueprint.route("/getAllReviews/<int:user_id>/<int:id>",methods=['GET','POST'])
 def getReviews(user_id,id):
     books_info=db.session.execute(db.select(Book_issue).where(Book_issue.ISBN_no==id)).scalars().all()
@@ -154,8 +151,7 @@ def getReviews(user_id,id):
         return jsonify({
             'reviews':reviews
         }),200
-        
-@cache.cached(timeout=60) 
+  
 @book_blueprint.route("/getAReview/<int:user_id>/<int:id>",methods=['GET','POST'])
 def getAReview(user_id,id):
     x=db.session.execute(db.select(Book_issue).where(Book_issue.ISBN_no==id).where(Book_issue.user_id==user_id)).scalar()
@@ -180,7 +176,7 @@ def getAReview(user_id,id):
             'reviews':reviews
         }),200
         
-@cache.cached(timeout=60) 
+
 @book_blueprint.route("/deleteReview",methods=['GET','POST'])
 def deleteReview():
     data=request.get_json()
