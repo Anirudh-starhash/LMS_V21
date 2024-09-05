@@ -607,7 +607,7 @@ def setTiming(user_id):
 def sendEmail(id):
     try:
         # Trigger the Celery task
-        get_activity(id)
+        job=get_activity(id)
         
         # Return the task ID to the client
         return jsonify({

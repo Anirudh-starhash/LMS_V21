@@ -102,90 +102,81 @@ class PDF(FPDF):
         self.ln(10)  # Add space after each book entry
 
 #generate_pdf 
-@celery.task
-def send_activity_report(self):
-    try:
-        users = User.query.all()
-        activities = []
-        for user in users:
-            # Get books issued by the user
-            info = db.session.execute(db.Select(Book_issue).where(Book_issue.user_id == user.user_id)).scalars().all()
-            issued_books = []
-            returned_books = []
-            requested_books = []
-            for x in info:
-                if x.doi is not None and x.re_issue == 1:
-                    issued_books.append(x)
-                elif x.return_date is not None and x.re_issue == 1:
-                    returned_books.append(x)
-                else:
-                    if x.re_issue == 1:
-                        requested_books.append(x)
+@celery.task(bind=True)
+def send_activity_report():
+    
+    users = User.query.all()
+    activities = []
+    for user in users:
+        # Get books issued by the user
+        info = db.session.execute(db.Select(Book_issue).where(Book_issue.user_id == user.user_id)).scalars().all()
+        issued_books = []
+        returned_books = []
+        requested_books = []
+        for x in info:
+            if x.doi is not None and x.re_issue == 1:
+                issued_books.append(x)
+            elif x.return_date is not None and x.re_issue == 1:
+                returned_books.append(x)
+            else:
+                if x.re_issue == 1:
+                    requested_books.append(x)
 
-            # Compile the data for the user
-            issued_books_list = [
-                {
-                    "title": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().title,
-                    "doi": issue.doi,
-                    "due_date": issue.due_date,
-                    "feedback": issue.feedback,
-                    "rating": issue.rating,
-                    "request_date": None,
-                    "return_date": None,
-                    "book_img": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().book_img_url,
-                }
-                for issue in issued_books
-            ]
-
-            returned_books_list = [
-                {
-                    "title": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().title,
-                    "return_date": issue.return_date,
-                    "feedback": issue.feedback,
-                    "rating": issue.rating,
-                    "doi": None,
-                    "request_date": None,
-                    "book_img": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().book_img_url,
-                }
-                for issue in returned_books
-            ]
-
-            requested_books_list = [
-                {
-                    "title": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().title,
-                    "request_date": issue.request_date,
-                    "doi": None,
-                    "return_date": None,
-                    "book_img": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().book_img_url,
-                }
-                for issue in requested_books
-            ]
-
-            user_info = {
-                "name": f"{user.user_fname} {user.user_lname}",
-                "profile_pic": user.profile_pic,
-                "email": user.user_email,
-                "issued_books": issued_books_list,
-                "returned_books": returned_books_list,
-                "requested_books": requested_books_list,
+        # Compile the data for the user
+        issued_books_list = [
+            {
+                "title": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().title,
+                "doi": issue.doi,
+                "due_date": issue.due_date,
+                "feedback": issue.feedback,
+                "rating": issue.rating,
+                "request_date": None,
+                "return_date": None,
+                "book_img": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().book_img_url,
             }
+            for issue in issued_books
+        ]
 
-            activities.append(user_info)
+        returned_books_list = [
+            {
+                "title": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().title,
+                "return_date": issue.return_date,
+                "feedback": issue.feedback,
+                "rating": issue.rating,
+                "doi": None,
+                "request_date": None,
+                "book_img": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().book_img_url,
+            }
+            for issue in returned_books
+        ]
 
-        # Pass the activities to the generate_pdf task
-        print(activities)
-        generate_pdf(activities)
+        requested_books_list = [
+            {
+                "title": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().title,
+                "request_date": issue.request_date,
+                "doi": None,
+                "return_date": None,
+                "book_img": db.session.execute(db.Select(Book_catalogue).where(Book_catalogue.ISBN_no == issue.ISBN_no)).scalar().book_img_url,
+            }
+            for issue in requested_books
+        ]
 
-    except ValueError as ve:
-        print(f"ValueError occurred: {ve}")
-        app.logger.error(f"ValueError in task {self.request.id}: {ve}")
+        user_info = {
+            "name": f"{user.user_fname} {user.user_lname}",
+            "profile_pic": user.profile_pic,
+            "email": user.user_email,
+            "issued_books": issued_books_list,
+            "returned_books": returned_books_list,
+            "requested_books": requested_books_list,
+        }
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        app.logger.error(f"Error in task {self.request.id}: {e}")
+        activities.append(user_info)
 
-    finally:
-        print("Task execution finished.")
+    # Pass the activities to the generate_pdf task
+    print(activities)
+    generate_pdf(activities)
+
+   
 
 
 def generate_pdf(activities):
@@ -301,7 +292,7 @@ def send_email(email, email_body):
         
         
 @celery.task
-def get_activity(self,id):
+def get_activity(id):
     user=db.session.execute(db.Select(User).where(User.user_id==id)).scalar()
     info=db.session.execute(db.Select(Book_issue).where(Book_issue.user_id==id)).scalars().all()
     
@@ -457,8 +448,7 @@ def setup_schedule_task(sender,**kwargs):
         
     
 @celery.task
-def print_current_time_job(self,name):
-    print("Received arguments:", self)
+def print_current_time_job(name):
     print("START")
     now=datetime.now()
     print("now in task =",now)

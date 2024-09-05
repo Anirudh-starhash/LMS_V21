@@ -308,7 +308,7 @@ def generate_report():
     # Start the Celery task
     try:
         # Trigger the Celery task
-        send_activity_report()
+        job=send_activity_report()
         
         
         
